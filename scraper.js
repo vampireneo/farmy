@@ -10,7 +10,7 @@ function initDatabase(callback) {
 	// Set up sqlite database.
 	var db = new sqlite3.Database("data.sqlite");
 	db.serialize(function() {
-		db.run('CREATE TABLE IF NOT EXISTS data (category TEXT, subCategory TEXT, productName TEXT, weight TEXT, price TEXT, link TEXT, createDate TEXT)');
+		db.run('CREATE TABLE IF NOT EXISTS data (category TEXT, subCategory TEXT, productName TEXT, weight TEXT, price REAL, link TEXT, createDate TEXT)');
 		db.run('CREATE TABLE IF NOT EXISTS target (url TEXT)');
 		callback(db);
 	});
@@ -49,14 +49,7 @@ function fetchPage(url, callback) {
 }
 
 function run(db) {
-	fetchPage(`${baseUrl}/en/shop/fruits-vegetables`, function(body) {
-		var $ = cheerio.load(body);
-		var targetUrls = [];
-		$('.product-link').each(function(i, el) {
-			//targetUrls.push(`${baseUrl}${$(this).attr('href')}`);
-			addTarget(db, `${baseUrl}${$(this).attr('href')}`);
-		})
-
+	function getDataFromTargets() {
 		db.serialize(function() {
 			db.each('select url from target', function(err, row) {
 				var url = row.url;
@@ -72,7 +65,7 @@ function run(db) {
 						var subCategory = $('#breadcrumbs li meta[content=3]').parent().find('span').text().trim();
 						var productName = $('meta[property="og:title"]').attr('content');
 						var weight = $('.col-photo-gallery .property-weight .item-value').text().trim();
-						var price = $('meta[property="product:price:amount"]').attr('content');
+						var price = parseFloat($('meta[property="product:price:amount"]').attr('content'));
 						var url = $('link[rel=alternate][hreflang=en]').attr('href');
 
 						updateRow(db, category, subCategory, productName, weight, price, url);
@@ -83,6 +76,15 @@ function run(db) {
 
 			// db.close();
 		});
+	}
+
+	fetchPage(`${baseUrl}/en/shop/fruits-vegetables`, function(body) {
+		var $ = cheerio.load(body);
+		var targetUrls = [];
+		$('.product-link').each(function(i, el) {
+			addTarget(db, `${baseUrl}${$(this).attr('href')}`);
+		});
+		getDataFromTargets();
 	});
 }
 
