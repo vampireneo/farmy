@@ -6,7 +6,7 @@ let sqlite3 = require('sqlite3').verbose();
 let moment = require('moment');
 
 let baseUrl = 'https://www.farmy.ch';
-let numberOfParallelRequests = 30;
+let numberOfParallelRequests = 30 || process.env.MORPH_PARALLELREQUESTS;
 let entryPages = [
 	'/en/shop/baskets',
 	'/en/shop/fruits-vegetables',
