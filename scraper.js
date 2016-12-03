@@ -6,7 +6,7 @@ let sqlite3 = require('sqlite3').verbose();
 let moment = require('moment');
 
 let baseUrl = 'https://www.farmy.ch';
-let numberOfParallelRequests = 30 || process.env.MORPH_PARALLELREQUESTS;
+let numberOfParallelRequests = process.env.MORPH_PARALLELREQUESTS || 30;
 let entryPages = [
 	'/en/shop/baskets',
 	'/en/shop/fruits-vegetables',
@@ -31,10 +31,13 @@ function initDatabase(callback) {
 }
 
 function updateRow(db, cat, subCat, name, weight, currency, price, producer, producedIn, certification, packaging, rating, link) {
-	// Insert some data.
-	const statement = db.prepare("INSERT INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))");
-	statement.run([cat, subCat, name, weight, currency, price, producer, producedIn, certification, packaging, rating, link]);
-	statement.finalize();
+	db.get('SELECT price FROM data where link = ? order by createDate desc limit 1', function (err, row) {
+		if (!row || (row && row.price !== price)) {
+			const statement = db.prepare("INSERT INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))");
+			statement.run([cat, subCat, name, weight, currency, price, producer, producedIn, certification, packaging, rating, link]);
+			statement.finalize();
+		}
+	});
 }
 
 function fetchPage(url, callback) {
