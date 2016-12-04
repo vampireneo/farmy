@@ -31,7 +31,7 @@ function initDatabase(callback) {
 }
 
 function updateRow(db, cat, subCat, name, weight, currency, price, producer, producedIn, certification, packaging, rating, link) {
-	db.get('SELECT price FROM data where link = ? order by createDate desc limit 1', function (err, row) {
+	db.get(`SELECT price FROM data where link = '${link}' order by createDate desc limit 1`, function (err, row) {
 		if (!row || (row && row.price !== price)) {
 			const statement = db.prepare("INSERT INTO data VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))");
 			statement.run([cat, subCat, name, weight, currency, price, producer, producedIn, certification, packaging, rating, link]);
@@ -57,7 +57,47 @@ function run(db) {
 	let pagesWithProducts = [];
 	let targetUrls = [];
 	let completedTarget = 0;
+	let duplicatedRecords = [];
 
+	function houseKeeping() {
+		db.all(`select productName, link, price, count(*) as counter from data group by productName, link, price having counter > 1`, function (err, rows) {
+			function RemoveDuplicatedRecords() {
+				if (duplicatedRecords.length <= 0) {
+					try {
+						db.close();
+					} catch (e) {
+						// do nth
+					}
+				} else {
+					let rec = duplicatedRecords.pop();
+					db.all(`Select * from data where link = '${rec.link}' order by createdate`, function (err, rows) {
+						let toBeDel = [];
+						let orgPrice = -1;
+						for (let i = 0; i < rows.length; i++) {
+							if (rows[i].price !== orgPrice) {
+								orgPrice = rows[i].price;
+							} else {
+								toBeDel.push(rows[i]);
+							}
+						}
+						const statement = db.prepare('delete from data where link = ? and createDate = ?');
+						let delCounter = 0;
+						while (toBeDel.length > 0) {
+							let r = toBeDel.pop();
+							// console.log(r);
+							statement.run([r.link, r.createDate]);
+							delCounter++;
+						}
+						console.log(`${delCounter} records is deleted.`);
+						statement.finalize();
+						RemoveDuplicatedRecords();
+					});
+				}
+			}
+			duplicatedRecords = rows;
+			RemoveDuplicatedRecords();
+		});
+	}
 	function getDataFromTargets() {
 		let url = targetUrls.pop();
 		if (url) {
@@ -83,11 +123,12 @@ function run(db) {
 
 				if (++completedTarget >= totalTargets) {
 					console.log(`${completedTarget} jobs completed ${startTime.toNow()}.`);
-					try {
-						db.close();
-					} catch (e) {
-						// do nth
-					}
+					houseKeeping();
+					// try {
+					// 	db.close();
+					// } catch (e) {
+					// 	// do nth
+					// }
 				} else {
 					getDataFromTargets();
 				}
@@ -131,6 +172,8 @@ function run(db) {
 			}
 		});
 	});
+
+
 }
 
 initDatabase(run);
