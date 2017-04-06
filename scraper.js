@@ -70,7 +70,7 @@ function run(db) {
 					}
 				} else {
 					let rec = duplicatedRecords.pop();
-					db.all(`Select * from data where link = '${rec.link}' order by createdate`, function (err, rows) {
+					db.all(`Select * from data where link = "${rec.link}" order by createdate`, function (err, rows) {
 						let toBeDel = [];
 						let orgPrice = -1;
 						for (let i = 0; i < rows.length; i++) {
